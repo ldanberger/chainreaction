@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <title>Chain Reaction Workbench</title>
+  <meta name="theme-color" content="#f59e0b">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Chain Reaction">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" href="icons/favicon-32.png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <script>
+    // apply the saved theme before first paint (light is the default)
+    try { if (localStorage.getItem('chainreaction.theme') === 'dark') document.documentElement.dataset.theme = 'dark'; } catch (e) {}
+  </script>
+  <link rel="stylesheet" href="css/styles.css?v=1.05">
+</head>
+<body>
+  <div id="ptr" aria-hidden="true"><span class="ptr-icon">&#x21BB;</span><span class="ptr-text">Pull to refresh</span></div>
+
+  <header id="topbar">
+    <div class="brand"><span class="logo">&#x2B58;</span> <span class="brand-name">Chain Reaction</span> <span class="muted brand-sub">Workbench</span>
+      <span class="version" id="versionVal" title="App version"></span></div>
+    <input id="projName" class="proj-name" type="text" spellcheck="false" title="Project name">
+    <button class="btn icon menu-toggle" id="btnMenu" title="Menu" aria-expanded="false">&#x2630;</button>
+    <div class="group top-menu" id="topMenu">
+      <button class="btn" id="btnNew" title="New project">New</button>
+      <button class="btn" id="btnOpen" title="Open a project .json file (Ctrl+O)">Open&hellip;</button>
+      <button class="btn" id="btnSave" title="Save project (Ctrl+S)">Save</button>
+      <button class="btn" id="btnSaveAs" title="Save project as a new file">Save As&hellip;</button>
+      <select id="exampleSel" class="btn" title="Load an example project">
+        <option value="">Examples&hellip;</option>
+      </select>
+      <label class="chk" title="Snap positions to a 10px grid"><input type="checkbox" id="snapChk"> Snap</label>
+      <label class="chk" title="Show runner and dragon paths"><input type="checkbox" id="pathsChk" checked> Paths</label>
+    </div>
+    <span class="spacer"></span>
+    <div class="group">
+      <button class="btn icon" id="btnUndo" title="Undo (Ctrl+Z)">&#x21B6;</button>
+      <button class="btn icon" id="btnRedo" title="Redo (Ctrl+Y)">&#x21B7;</button>
+      <button class="btn" id="btnFit" title="Fit work area to window (F)">Fit</button>
+      <button class="btn icon" id="btnTheme" title="Switch to dark theme">&#x263E;</button>
+      <button class="btn icon" id="btnHelp" title="Help &amp; shortcuts">?</button>
+    </div>
+    <input type="file" id="fileInput" accept=".json,application/json" hidden>
+  </header>
+
+  <div id="main">
+    <aside id="left">
+      <div id="panelSwitch" role="tablist">
+        <button class="ps-btn active" data-panel="toolkit" role="tab">Toolkit</button>
+        <button class="ps-btn" data-panel="props" role="tab" id="psProps">Properties</button>
+      </div>
+      <section id="toolkit" class="panel">
+        <h2>Toolkit <span class="hint" id="toolHint">drag into the work area</span></h2>
+        <div id="toolList"></div>
+      </section>
+      <section id="props" class="panel">
+        <h2 id="propTitle">Properties</h2>
+        <div id="propBody"></div>
+      </section>
+    </aside>
+
+    <section id="center">
+      <div id="tabbar">
+        <div id="tabs"></div>
+        <button class="tab-add" id="btnAddLayer" title="New layer">+</button>
+        <span class="spacer"></span>
+        <div class="menu-wrap">
+          <button class="btn small" id="btnLayers" title="All layers, including closed ones">Layers &#x25BE;</button>
+          <div id="layerMenu" class="menu" hidden></div>
+        </div>
+      </div>
+
+      <div id="stage">
+        <canvas id="canvas"></canvas>
+        <div id="emptyState" hidden>
+          <p>No layer is open.</p>
+          <p class="muted">Reopen one from the <b>Layers</b> menu, or</p>
+          <button class="btn primary" id="btnEmptyNew">Create a new layer</button>
+        </div>
+        <div id="toast" hidden></div>
+      </div>
+
+      <div id="commandbar">
+        <button class="cmd" id="btnRestart" title="Restart from the beginning (R)">&#x27F2;<span class="lbl"> Restart</span></button>
+        <button class="cmd" id="btnStep" title="Advance one frame (.)  Shift = 10 frames">&#x23ED;<span class="lbl"> Step</span></button>
+        <button class="cmd primary" id="btnRun" title="Run / pause (Space)">&#x25B6; Run</button>
+        <div class="speed" title="Simulation speed (- / +)">
+          <button class="cmd small" id="btnSlower">&minus;</button>
+          <span id="speedVal">1&times;</span>
+          <button class="cmd small" id="btnFaster">+</button>
+        </div>
+        <div id="flipBtns" title="Paddle keys — hold to flip"></div>
+        <span class="readout score" id="scoreVal" hidden>Score 0</span>
+        <span class="readout" id="timeVal">t = 0.00 s</span>
+        <span class="readout muted" id="statusVal">Editing</span>
+        <span class="spacer"></span>
+        <span class="readout muted" id="cursorVal"></span>
+      </div>
+    </section>
+  </div>
+
+  <dialog id="helpDlg">
+    <h2>Chain Reaction Workbench <span class="version" id="helpVersion"></span></h2>
+    <p>Add objects from the Toolkit, wire them together, then press <b>Run</b>.</p>
+    <h3>Mouse</h3>
+    <ul>
+      <li><b>Drag</b> a Toolkit item into the work area (or double-click it to drop it in the centre).</li>
+      <li><b>Click</b> an object to select it and edit it in Properties. <b>Drag</b> to move; drag the round orange handle to rotate.</li>
+      <li><b>Blue handles</b>: square ones change length (ramps, trampolines, curved-ramp ends); round ones set a curve's radius or a paddle's rest/flipped angle.</li>
+      <li><b>Paths</b> (fuse, runner, dragon): drag the points; double-click the line to add a point; double-click a point to remove it.</li>
+      <li><b>Drag empty space</b> or middle-drag to pan. <b>Wheel</b> to zoom.</li>
+    </ul>
+    <h3>Touch (phone / tablet)</h3>
+    <ul>
+      <li><b>Tap</b> a Toolkit item to add it to the middle of the view, then drag it into place.</li>
+      <li><b>Tap</b> an object to select it; switch to <b>Properties</b> to edit it.</li>
+      <li><b>Double-tap</b> a path to add a point, or a point to remove it.</li>
+      <li><b>One finger</b> on empty space pans; <b>two fingers</b> pinch to zoom.</li>
+      <li><b>Pull down</b> on the top bar to refresh (handy when installed on the home screen).</li>
+    </ul>
+    <h3>Keyboard</h3>
+    <ul class="keys">
+      <li><kbd>Space</kbd> run / pause</li>
+      <li><kbd>.</kbd> step (<kbd>Shift</kbd> = 10 frames)</li>
+      <li><kbd>R</kbd> restart</li>
+      <li><kbd>-</kbd> / <kbd>+</kbd> speed</li>
+      <li><kbd>Del</kbd> delete selection</li>
+      <li><kbd>Ctrl</kbd>+<kbd>D</kbd> duplicate</li>
+      <li><kbd>Arrows</kbd> nudge (<kbd>Shift</kbd> = 10px)</li>
+      <li><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Y</kbd> undo / redo</li>
+      <li><kbd>Ctrl</kbd>+<kbd>S</kbd> save &middot; <kbd>Ctrl</kbd>+<kbd>O</kbd> open</li>
+      <li><kbd>F</kbd> fit view &middot; <kbd>Esc</kbd> deselect</li>
+    </ul>
+    <h3>Pinball</h3>
+    <p class="muted">Give each paddle a <b>Flip key</b> in Properties (click the box, then press the key). While running, hold the key — or the matching on-screen button — to flip. Targets and bumpers can set off another object via <b>When hit, trigger</b>.</p>
+    <h3>Triggers</h3>
+    <p class="muted">Every active object has a <b>Trigger</b>: <i>At start</i>, <i>When touched</i> (bumped by something moving, reached by a burning fuse, or hit by dragon fire) or <i>Never</i>, plus an optional delay. Fuses and cannons are also lit by fire or by a fuse ending on them.</p>
+    <h3>Layers</h3>
+    <p class="muted">Each layer is its own scene, shown as a tab. Close a tab to put the layer away; reopen it from the Layers menu. All layers are saved together in one .json project file.</p>
+    <form method="dialog"><button class="btn primary">Close</button></form>
+  </dialog>
+
+  <script src="js/version.js?v=1.05"></script>
+  <script src="lib/matter.min.js?v=0.19.0"></script>
+  <script src="js/objects.js?v=1.05"></script>
+  <script src="js/objects-more.js?v=1.05"></script>
+  <script src="js/sim.js?v=1.05"></script>
+  <script src="js/examples.js?v=1.05"></script>
+  <script src="js/app.js?v=1.05"></script>
+</body>
+</html>
