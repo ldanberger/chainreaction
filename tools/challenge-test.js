@@ -6,7 +6,8 @@
 (function () {
   'use strict';
   const CR = window.CR;
-  const LAYER_SECONDS = 20;
+  const LAYER_SECONDS = 60;
+  const IDLE_FRAMES = 150; // the app stops a run after 3 s (180 frames at 1x) with nothing moving; stricter here
 
   // the same clean-up the app does: safety check, then fill in missing settings
   function prepare(project) {
@@ -38,15 +39,17 @@
     let li = 0, total = 0, guard = 0;
     while (li < p.layers.length && guard++ < 10) {
       const sim = new CR.Sim(p.layers[li]);
-      let next = null;
+      let next = null, idle = 0;
       for (let f = 0; f < 60 * LAYER_SECONDS; f++) {
         sim.step();
         if (sim.goalAt != null) return { solved: true, at: total + sim.t, layer: li + 1 };
         const pl = sim.pendingLayer;
         if (pl && sim.t >= pl.at - 1e-9) { next = pl.layerId ? p.layers.findIndex((L) => L.id === pl.layerId) : li + 1; break; }
+        idle = sim.isIdle() ? idle + 1 : 0;
+        if (idle >= IDLE_FRAMES) break; // the app would stop the run here
       }
       total += sim.t;
-      if (next == null || next < 0) return { solved: false, layer: li + 1, note: next == null ? `stuck on level ${li + 1}` : 'gateway to nowhere' };
+      if (next == null || next < 0) return { solved: false, layer: li + 1, note: next == null ? `stuck on level ${li + 1} at ${sim.t.toFixed(1)}s` : 'gateway to nowhere' };
       li = next;
     }
     return { solved: false, layer: li + 1, note: 'ran out of levels' };
@@ -112,5 +115,5 @@
       sum.className = 'fail';
     }
   });
-  start(CR.sanitizeChallengeSet(window.CR_CHALLENGE_DATA).set);
+  if (location.hash !== '#lab') start(CR.sanitizeChallengeSet(window.CR_CHALLENGE_DATA).set); // #lab: just load, for console experiments
 })();

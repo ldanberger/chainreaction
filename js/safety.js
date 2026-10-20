@@ -277,6 +277,7 @@
         emoji: text(c.emoji ?? '🧩', 8, R, 'emoji'),
         levels: project.layers.length,
         goal: text(c.goal ?? '', 200, R, 'goal'),
+        machines: (Array.isArray(c.machines) ? c.machines : []).filter((m) => typeof m === 'string').slice(0, 20).map((m) => text(m, 40, R, 'machine name')),
         objects: num(c.objects ?? 0, 0, 100000, 0, R, 'object count'),
         pieces: num(c.pieces ?? 0, 0, 100000, 0, R, 'piece count'),
         allowed,

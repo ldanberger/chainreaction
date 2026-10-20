@@ -1462,7 +1462,7 @@
     if (!L) return m;
     for (const o of L.objects) {
       if (o.type === 'paddle' && o.key) m.set(CR.normKey(o.key), CR.keyLabel(CR.normKey(o.key)));
-      else if (o.type === 'button') {
+      else if (o.type === 'button' && (o.onscreen !== false || o.key)) {
         const k = CR.buttonKey(o);
         m.set(k, o.label || (o.key ? CR.keyLabel(CR.normKey(o.key)) : 'Button'));
       }
@@ -1811,16 +1811,18 @@
     if (!c) return;
     const d = done[keyOf(st, c)];
     const facts = [c.difficulty[0].toUpperCase() + c.difficulty.slice(1), c.theme, c.levels > 1 ? `${c.levels} levels` : '', c.objects ? `${c.objects} objects` : '', c.pieces ? `add ${c.pieces}` : ''].filter(Boolean).join(' · ');
-    det.append(
+    det.append(...[
       el('div', { class: 'cd-name' }, `${c.emoji} ${c.name}`),
       el('div', { class: 'muted' }, facts),
       c.goal ? el('p', {}, c.goal) : null,
+      c.machines && c.machines.length ? el('p', { class: 'muted' }, 'Machines: ' + c.machines.join(', ')) : null,
       el('p', { class: 'muted' }, 'You may add: ' + (c.allowed.length ? c.allowed.map((t) => (CR.types[t] ? CR.types[t].label : t)).join(', ') : 'anything')),
       st.author && !st.builtin ? el('p', { class: 'muted' }, `From “${st.name}” by ${st.author}`) : null,
       el('p', { class: d ? 'cd-solved' : 'muted' }, d ? `${d.helped ? '💡 Solved with the solution shown' : '✓ Solved'} on ${new Date(d.at).toLocaleDateString()}` : 'Not solved yet'),
       el('div', { class: 'prop-actions' },
         el('button', { class: 'btn primary', onclick: () => playChallenge(st, c, false) }, d ? '↻ Play again' : '▶ Play'),
-        c.solution.some((x) => x.length) ? el('button', { class: 'btn', onclick: () => playChallenge(st, c, true), title: 'Load it with the solution’s pieces already in place' }, '💡 Show solution') : null));
+        c.solution.some((x) => x.length) ? el('button', { class: 'btn', onclick: () => playChallenge(st, c, true), title: 'Load it with the solution’s pieces already in place' }, '💡 Show solution') : null),
+    ].filter(Boolean));
   }
   /** "Load challenge file…": a challenge set (.json) made for this app; it's kept in this browser. */
   function loadChallengeFile() { $('#chalFileInput').click(); }

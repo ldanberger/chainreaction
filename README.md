@@ -57,7 +57,7 @@ The Toolkit shows icons only — hover (or long-press) a tile to see its name an
 | **Launchers:** Slingshot | Put a marble (or anything) in the dotted circle at its pouch; when triggered it fires the load along its aim. Use *Size* for a bigger one. |
 | **Fire:** Bomb | Once lit, its fuse fizzes for the fuse time, then it blasts nearby objects away and sets off touch-triggered ones. |
 | **Vehicles:** Spaceship | Flies its path carrying another object hidden inside (*Carries*), then lets it out at the end of its path or after *Drop after* seconds: walkers and flyers (like the alien) come down a tractor beam to the start of their own path and set off; anything else drops out of the hatch. Then it can fly away. |
-| **Controls:** Button | Big push button with an on-screen button in the command bar (and an optional key). Pressing it while running, or bumping something into it, sets off up to three linked objects. |
+| **Controls:** Button | Big push button with an on-screen button in the command bar (untick *On-screen button* to leave it out) and an optional key. Pressing it while running, or bumping something into it, sets off up to three linked objects. |
 | **Controls:** Countdown | Counts down on screen (e.g. *T-10*), then sets off up to three linked objects: launch a rocket, fire a cannon, start a car. |
 | **Halloween** | Jack-o'-lantern (rolling, glowing), skeleton (walks a path), witch and ghost (fly a path), cauldron (catches things), tombstone (topples). |
 | **Christmas** | Christmas tree (lights come on), present (bursts open with confetti and a jack-in-the-box, can trigger another object), snowman (topples), Santa's sleigh (flies a path), ornament (bouncy bauble). |
@@ -84,14 +84,14 @@ Dashed runner/dragon paths are editing guides and are hidden while a run is in p
 
 ## Challenges
 
-**🏆 Challenges** (in the menu) has 130 built-in chain-reaction puzzles in classic, prehistoric, Barbie, Halloween, space (low gravity), Christmas, birthday and weather themes. Object and piece counts are approximate and leave out decoration; any approach that sets off the goal counts.
+**🏆 Challenges** (in the menu) has 130 built-in chain-reaction puzzles in classic, prehistoric, Barbie, Halloween, space, Christmas, birthday, construction and weather themes. Each one strings together different small machines — a wrecking ball and pillars, a crane drop, a match, fuse and cannon, a car jump, a trampoline bounce, zig-zag ramps, a slinky on a stairway, a balloon tipping a seesaw, an escalator, someone pushing a ball along, a domino run set off by a cannon, slingshot or dump truck — spread over the floor and two shelves in a different order each time (snaking up or down, by columns, a spiral, criss-crossing), each machine running left or right. Every machine ends on a button or a detonator plunger wired to the next one. Pieces are missing from some machines; put them back. Object and piece counts are approximate and leave out decoration; any approach that sets off the goal counts.
 
-| Difficulty | Count | Objects in the chain | Pieces to add |
-|---|---|---|---|
-| Easy | 30 | up to 10 | 3 |
-| Medium | 40 | about 30 | 10 |
-| Hard | 30 | about 50 | 5 |
-| Very hard | 30 | about 30 | about 7, of several kinds |
+| Difficulty | Count | Machines | Objects | Pieces to add |
+|---|---|---|---|---|
+| Easy | 30 | 2 | about 10 | 2–4 |
+| Medium | 40 | 5 | about 30 | 5–8 |
+| Hard | 30 | 7–8 | about 50 | 3–5 |
+| Very hard | 30 | 5 | about 30 | 5–8, of several kinds |
 
 10 of the hard and very hard ones have two levels linked by gateways. Each challenge has a 🏁 goal object; when it goes off, a **Challenge complete!** banner appears and the challenge is ticked off. The Challenges window shows a solved counter and every challenge, filterable by difficulty, multi-level or not solved yet. Pick one to **Play** (or play again; switching between challenges never asks to save), or **Show solution** to load it with the answer's pieces already placed (a challenge solved that way is marked 💡 rather than ✓). Progress is kept in this browser.
 
@@ -173,6 +173,7 @@ tools/scan-code.js    security scan of the code: `node tools/scan-code.js`
 tools/safety-test.html  hostile-file test page (open through `python serve.py`)
 tools/challenge-test.html  checks every challenge in a challenge file: unsolved as it comes, solved by its solution
 tools/build-challenges.js  builds the built-in challenge file: `node tools/build-challenges.js`
+tools/challenge-segments.js  the small machines the built-in challenges are made of
 challenges/builtin.json  the built-in challenges (130), as a plain challenge file
 js/challenges-data.js the same data for the app to load (generated; the page can't fetch files)
 CHALLENGE-PROMPT.md   the challenge file format, and a prompt to share for making new ones

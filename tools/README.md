@@ -16,12 +16,18 @@ See [SECURITY.md](../SECURITY.md) for the limits and the Content-Security-Policy
 # Challenge check
 
 - `node tools/build-challenges.js` builds the built-in challenge file `challenges/builtin.json` and the
-  copy the app loads, `js/challenges-data.js` (130 challenges, deterministic, with solutions).
+  copy the app loads, `js/challenges-data.js` (130 challenges, deterministic, with solutions). Each
+  challenge strings together machines from `tools/challenge-segments.js` (each fits one cell of a
+  3 x 3 grid and can run either way); the builder picks the machines, the route through the grid,
+  and which pieces to take out.
 - `tools/challenge-test.html` (through `python serve.py`, at `http://localhost/tools/challenge-test.html`)
   runs every challenge in a challenge file twice: as it comes, where it must **not** be solved, and
   with its stored solution added, where its 🏁 goal must go off. Multi-level challenges are followed
-  through their gateways. It starts with the built-in set; choose another file on the page to check
-  it. All should say PASS. Run it after changing an object's physics or the challenge builder.
+  through their gateways. A run that stands still for 2.5 seconds counts as stuck (the app stops a
+  run after 3). It starts with the built-in set; choose another file on the page to check it. All
+  should say PASS. Run it after changing an object's physics or the challenge builder. Open it as
+  `challenge-test.html#lab` to load everything without running the set, for trying out machines
+  from the browser console with `CR.solveChallenge` and `CRSegments.place`.
 
 # Image tools
 

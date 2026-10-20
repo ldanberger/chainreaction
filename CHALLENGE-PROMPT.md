@@ -66,6 +66,8 @@ Each **CHALLENGE**:
 - `allowed`: the object types the player may add. They're the only ones offered in their toolkit.
 - `solution`: one list per layer of the project, holding the objects that solve it. Players can ask
   to see it ("Show solution").
+- `machines` (optional): short names of the contraptions in it, e.g. `["crane drop", "domino run"]`,
+  shown in the Challenges window.
 
 **PROJECT** (one puzzle; a project can have several layers, which are levels):
 
@@ -121,9 +123,12 @@ are used.
   It knocks the first domino over. Use `"trigger":"touch"` for a cannon that something else must
   set off: a marble the player drops on it (`{"type":"marble","x":144,"y":TOP-80,"r":14}`), or a
   button's link.
-- **Button** where a row ends: `{"type":"button","x":LASTX+40,"y":TOP-8,"link":"<id of next row's cannon>"}`.
-  The last domino falls on it and it fires the linked object (which needs `"trigger":"touch"`).
-  `link2`/`link3` fire more objects.
+- **Button** where a row ends: `{"id":"b1","type":"button","x":LASTX+40,"y":TOP-8,"link":"<id of next row's cannon>","onscreen":false}`.
+  The last domino falls on it and it fires the linked object. Give that object
+  `"trigger":"by","by":"b1"` so nothing else can set it off early (a `"touch"` trigger also works, but
+  anything bumping into it fires it). `"onscreen":false` keeps the button out of the command bar,
+  so players can't just press it. `link2`/`link3` fire more objects. A detonator `plunger` works the
+  same way, with a wire drawn to what it sets off.
 - **Goal gift** where the last row ends: `{"type":"giftbox","x":LASTX+36,"y":TOP-18,"trigger":"touch","goal":true}`.
 - **Hole in a shelf**: split the shelf into two ramps with a gap of 2–3 domino spacings; the
   solution is a ramp patch over the hole plus the dominoes that stand on it.
@@ -137,6 +142,12 @@ are used.
   `{"type":"marble","x":130,"y":520}` on it rolls off at about x 500 and knocks dominoes starting
   at x 560.
 - **Only one object may set something off**: `"trigger":"by","by":"<that object's id>"`.
+- **More machines** (they're what the built-in set is made of, in `tools/challenge-segments.js`, with
+  exact positions): a `wreckingball` swinging into a row of `pillar`s; a `crane` dropping its `holds`
+  object onto a slope; a `match` lighting a `fuse` that ends at a `cannon` lobbing a ball over a wall;
+  a `car` jumping a low wall off a ramp; a `cannon` on a ledge firing onto a `trampoline`; a `slinky`
+  walking down `stairs` into dominoes; a `crane` letting go of a `balloon` under a `seesaw`; an
+  `escalator` carrying a ball up to a ledge; a `runner` (or `caveman`, `skeleton`, …) pushing a ball.
 
 ### Object types you can use
 
