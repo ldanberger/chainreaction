@@ -28,7 +28,19 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def end_headers(self):
         self.send_header('Cache-Control', 'no-store')
+        # security headers a <meta> Content-Security-Policy can't set (see SECURITY.md)
+        self.send_header('Content-Security-Policy', "frame-ancestors 'none'")
+        self.send_header('X-Frame-Options', 'DENY')
+        self.send_header('X-Content-Type-Options', 'nosniff')
+        self.send_header('Referrer-Policy', 'no-referrer')
         super().end_headers()
+
+    def send_head(self):
+        # never serve hidden files or folders (.git, .claude, ...) to other devices on the network
+        if any(part.startswith('.') for part in self.path.split('?', 1)[0].split('/') if part):
+            self.send_error(404, 'File not found')
+            return None
+        return super().send_head()
 
 
 def lan_ip():

@@ -1,0 +1,9 @@
+body { font: 14px/1.45 system-ui, sans-serif; margin: 24px; max-width: 900px; color: #1f2933; background: #fff; }
+code { background: #f1f5f9; padding: 0 4px; border-radius: 4px; }
+#summary { font-weight: 700; font-size: 16px; }
+#summary.pass { color: #15803d; }
+#summary.fail { color: #b91c1c; }
+li { margin: 4px 0; }
+li.pass::marker { color: #15803d; }
+li.fail { color: #b91c1c; font-weight: 600; }
+.detail { color: #64707d; font-size: 12px; }

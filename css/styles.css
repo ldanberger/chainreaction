@@ -231,7 +231,7 @@ input[type=checkbox] { accent-color: var(--accent); }
 #commandbar {
   display: flex; align-items: center; gap: 8px;
   padding: 8px 12px;
-  background: var(--panel2); border-top: 1px solid var(--line);
+  background: var(--panel2); border-bottom: 1px solid var(--line);
 }
 .cmd { padding: 7px 14px; font-size: 14px; }
 .cmd.primary { min-width: 96px; }
@@ -358,11 +358,74 @@ kbd {
   #commandbar::-webkit-scrollbar { display: none; }
   .frame-part { display: none; }
 }
+/* phones while a run is in progress: the work area gets the whole screen (pause brings the panels back) */
+@media (max-width: 700px), (max-height: 520px) {
+  body.running #left, body.running #topbar, body.running #tabbar { display: none; }
+}
 @media (max-width: 480px) {
   .brand-name { display: none; }
   #topbar { gap: 4px; }
   #topbar .group { gap: 4px; }
 }
+
+/* challenge mode */
+#btnChallenge.on { background: #16a34a; color: #fff; border-color: #16a34a; }
+.chal-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 8px 0 2px; font-size: 12px; }
+.chal-bar .chal-label { color: var(--muted); }
+.chal-bar .btn.active { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.chal-bar.on { color: #15803d; font-weight: 600; }
+.chal-hint { flex-basis: 100%; font-size: 11px; }
+.tool { position: relative; }
+.tool .pick {
+  position: absolute; top: 2px; right: 2px; width: 14px; height: 14px;
+  border: 1px solid var(--btn-border); border-radius: 3px; background: var(--input);
+  font-size: 10px; line-height: 12px; text-align: center; color: #fff; cursor: pointer;
+}
+.tool .pick.on { background: #16a34a; border-color: #16a34a; }
+.tool .pick.badge { pointer-events: none; }
+.lock-note { color: #b45309; }
+
+/* challenge complete banner */
+#winBanner {
+  position: absolute; left: 50%; top: 18px; transform: translateX(-50%); z-index: 5;
+  background: var(--panel2); border: 2px solid #16a34a; border-radius: 12px;
+  box-shadow: 0 10px 30px var(--shadow); padding: 12px 18px; text-align: center; max-width: 92%;
+}
+.win-title { font-size: 20px; font-weight: 800; color: #15803d; }
+.win-sub { color: var(--muted); margin: 2px 0 8px; }
+.win-actions { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+
+/* challenges window */
+#chalDlg { max-width: 860px; width: 94vw; }
+.cd-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.cd-head select { width: auto; max-width: 260px; }
+.cd-head h2 { margin: 0; }
+.cd-count { font-weight: 700; color: #15803d; }
+.cd-progress { height: 8px; background: var(--line); border-radius: 4px; margin: 8px 0; overflow: hidden; }
+#cdBar { height: 100%; background: #16a34a; width: 0; transition: width .3s; }
+.cd-filters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.cd-filters .btn.active { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.cd-body { display: grid; grid-template-columns: 1fr 260px; gap: 12px; }
+.cd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(52px, 1fr)); gap: 5px; max-height: 52vh; overflow: auto; align-content: start; }
+.cd-tile {
+  position: relative; height: 46px; border-radius: 8px; cursor: pointer; font: inherit;
+  border: 2px solid transparent; color: #1f2933; display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.cd-tile.easy { background: #dcfce7; }
+.cd-tile.medium { background: #fef9c3; }
+.cd-tile.hard { background: #fee2e2; }
+.cd-tile.very-hard { background: #e9d5ff; }
+.cd-tile.picked { border-color: var(--accent); }
+.cd-tile .n { font-weight: 700; font-size: 13px; line-height: 1; }
+.cd-tile .e { font-size: 14px; line-height: 1.2; }
+.cd-tile .lv { position: absolute; left: 3px; top: 2px; font-size: 9px; font-weight: 700; color: #6d28d9; }
+.cd-tile .ok { position: absolute; right: 3px; top: 1px; font-size: 12px; font-weight: 800; color: #15803d; }
+.cd-tile.done { box-shadow: inset 0 0 0 2px #16a34a; }
+.cd-detail { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+.cd-name { font-weight: 800; font-size: 15px; }
+.cd-solved { color: #15803d; font-weight: 600; }
+.cd-foot { margin: 10px 0 0; font-size: 12px; }
+@media (max-width: 700px) { .cd-body { grid-template-columns: 1fr; } .cd-grid { max-height: 38vh; } }
 
 /* pinball: flipper buttons + score */
 #flipBtns { display: inline-flex; gap: 6px; }

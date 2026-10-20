@@ -37,6 +37,31 @@
     });
   };
 
+  // Dragon's Journey: the dragon comes out of an arrival gateway (top left), flies across the
+  // top of the layer -- looping the loop at the `loops` x positions to give the layer below time
+  // to play out -- and into the exit gateway (top right). The exit switches layers the moment the
+  // dragon is centred in it (wait = the last 55px at its speed), so the flight carries straight on.
+  const GATE_Y = 150, LOOP_R = 90, LOOP_TOP = 112, DRAGON_SPEED = 150;
+  const journey = (opt = {}) => {
+    const p = [[175, GATE_Y], [420, LOOP_TOP]];
+    for (const cx of opt.loops || []) {
+      for (let d = -90; d <= 270; d += 30) {
+        const a = (d * Math.PI) / 180;
+        p.push([Math.round(cx + LOOP_R * Math.cos(a)), Math.round(LOOP_TOP + LOOP_R + LOOP_R * Math.sin(a))]);
+      }
+    }
+    p.push([1500, GATE_Y]);
+    return [
+      { type: 'gateway', x: 95, y: GATE_Y, w: 110, h: 130, arrival: true, color: '#7c3aed' },
+      { type: 'dragon', points: pts(...p.flat()), speed: DRAGON_SPEED, fireMode: opt.fireMode || 'off', trigger: 'start', delay: 0 },
+      { type: 'gateway', x: 1500, y: GATE_Y, w: 110, h: 130, wait: 0.35, target: opt.target || '', color: '#7c3aed' },
+    ];
+  };
+
+  // Challenges: everything is locked (Challenge mode ON); the player solves them by adding the allowed pieces
+  const locked = (objs) => objs.map((o) => Object.assign({ locked: true }, o));
+  const say = (lines, color = '#1e3a8a') => lines.map((t, i) => ({ type: 'text', x: 800, y: 60 + i * 36, text: t, size: i ? 22 : 28, bold: true, color }));
+
   CR.examples = [
     {
       name: 'Chain Reaction',
@@ -300,6 +325,260 @@
             { type: 'firering', x: 1450, y: 740, r: 60, th: 10, stand: true, trigger: 'fire' },
             { type: 'kangaroo', x: 1540, y: 845, direction: -1, trigger: 'touch', jumps: 3 },
           ],
+        }],
+      },
+    },
+    {
+      name: "Dragon's Journey (7 layers)",
+      description: 'A dragon flies out of a gateway, across the top of each layer and straight into the next one, while each layer plays out its own scene below: dominoes, a slinky, a countdown, a party, a rainy day with a spaceship and a rainbow, a snowy Stone Age cave and a pink party.',
+      project: {
+        name: "Dragon's Journey",
+        activeLayerId: 'dj1',
+        speed: 0.25, // starts slow so you can follow it
+        layers: [
+          {
+            id: 'dj1', name: '1 · Domino Valley',
+            world: world({ walls: true }),
+            objects: [
+              ...journey({ loops: [1250] }),
+              { type: 'text', x: 800, y: 300, text: "DRAGON'S JOURNEY", size: 60, bold: true, color: '#4c9a2a' },
+              { type: 'text', x: 800, y: 380, text: 'PRESS RUN ▶', size: 40, bold: true, color: '#f59e0b' },
+              { type: 'ramp', x: 300, y: 380, w: 440, h: 14, angle: 18, color: '#a0703c' },
+              { type: 'ramp', x: 760, y: 600, w: 460, h: 14, angle: 14, color: '#a0703c' },
+              { type: 'marble', x: 120, y: 270, r: 14, color: '#3b82f6' },
+              ...dominoes(1180, 10, 34),
+              { type: 'jumper', x: 1530, y: 852, trigger: 'touch', jumpVy: 10, jumpVx: 0, jumps: 3, interval: 0.9, color: '#2a9d8f' },
+            ],
+          },
+          {
+            id: 'dj2', name: '2 · Slinky Stairs',
+            world: world({ walls: true, background: '#eef6ea' }),
+            objects: [
+              ...journey({ loops: [700] }),
+              { type: 'stairs', x: 330, y: 740, steps: 7, stepW: 60, stepH: 40, dir: 1, color: '#a8a29e' },
+              { type: 'slinky', x: 150, y: 585, hop: 60, time: 0.5, hops: 9, stopOnFlat: false, trigger: 'start', delay: 0.5, color: '#94a3b8' },
+              ...dominoes(650, 10, 34),
+              { type: 'button', x: 1030, y: 872, label: 'Go', link: 'dj2car', color: '#16a34a' },
+              { id: 'dj2car', type: 'car', x: 1120, y: 865, speed: 8, trigger: 'touch', color: '#2563eb', number: '2' },
+              ...dominoes(1330, 6, 36, { color: '#cde7ff' }),
+            ],
+          },
+          {
+            id: 'dj3', name: '3 · Countdown',
+            world: world({ walls: true, background: '#1e293b' }),
+            objects: [
+              ...journey({ loops: [850] }),
+              { type: 'countdown', x: 330, y: 760, seconds: 3, link: 'dj3rocket' },
+              { id: 'dj3rocket', type: 'rocket', points: pts(150, 830, 150, 500, 380, 660, 520, 850, 700, 660, 1000, 380), speed: 300, trigger: 'touch' },
+              { type: 'fuse', points: pts(480, 872, 640, 872, 705, 866), trigger: 'fire', burnSpeed: 130 },
+              { type: 'car', x: 750, y: 865, speed: 9, trigger: 'touch', color: '#f97316', number: '3' },
+              { type: 'firering', x: 1000, y: 830, r: 46, th: 8, stand: false, burnTime: 6, trigger: 'start' },
+              { type: 'fuse', points: pts(1180, 874, 1300, 874, 1390, 800), trigger: 'fire', burnSpeed: 130 },
+              { type: 'firering', x: 1450, y: 740, r: 60, th: 10, stand: true, burnTime: 5, trigger: 'fire' },
+              { type: 'kangaroo', x: 1540, y: 845, direction: -1, trigger: 'touch', jumps: 2 },
+            ],
+          },
+          {
+            id: 'dj4', name: '4 · Party',
+            world: world({ walls: true, background: '#fdf2f8' }),
+            objects: [
+              ...journey({ loops: [800], fireMode: 'always' }),
+              { type: 'text', x: 760, y: 560, text: 'HOORAY!', size: 120, bold: true, bounce: 0.6, color: '#db2777' },
+              { type: 'superball', x: 520, y: 300, r: 12, color: '#a855f7' },
+              { type: 'basketball', x: 760, y: 280, r: 20 },
+              { type: 'superball', x: 1000, y: 320, r: 12, color: '#22c55e' },
+              { type: 'countdown', x: 230, y: 700, seconds: 3, go: 'GO!', link: 'dj4car', link2: 'dj4ring' },
+              { id: 'dj4car', type: 'car', x: 160, y: 865, speed: 9, trigger: 'touch', color: '#7c3aed', number: '4' },
+              { id: 'dj4ring', type: 'firering', x: 1080, y: 830, r: 46, th: 8, stand: false, burnTime: 5, trigger: 'fire' },
+              ...dominoes(1300, 7, 36, { color: '#fbcfe8' }),
+              // a marble rolls off the little slope onto "Boom" (or press it yourself): the cannon fires at the letters
+              { type: 'ramp', x: 470, y: 300, w: 110, h: 10, angle: -12, color: '#be185d' },
+              { type: 'marble', x: 512, y: 280, r: 12, color: '#f59e0b' },
+              { type: 'ramp', x: 330, y: 470, w: 240, h: 14, angle: 0, color: '#be185d' },
+              { type: 'button', x: 400, y: 456, label: 'Boom', link: 'dj4cannon', color: '#dc2626' },
+              { id: 'dj4cannon', type: 'cannon', x: 260, y: 449, angle: -30, power: 13, trigger: 'touch', delay: 0 },
+            ],
+          },
+          {
+            id: 'dj5', name: '5 · Visitors',
+            world: world({ walls: true, background: '#bfe3ff' }),
+            objects: [
+              // a sunny day... (the sun darkens everything listed before it)
+              { type: 'cloud', x: 420, y: 330, w: 200, drift: 50, distance: 1500, trigger: 'start', delay: 1.5 },
+              { type: 'cloud', x: 1000, y: 390, w: 170, drift: 60, distance: 900, trigger: 'start', delay: 1 },
+              { type: 'sun', x: 1380, y: 430, r: 55, trigger: 'start', delay: 3, fade: 4, dim: 0.55 },
+              ...journey({ loops: [600, 1050] }),
+              // ...turns to rain
+              { id: 'dj5cloudA', type: 'darkcloud', x: -250, y: 360, w: 260, drift: 120, distance: 750, trigger: 'start', delay: 3 },
+              { id: 'dj5cloudB', type: 'darkcloud', x: 1850, y: 340, w: 300, drift: -120, distance: 650, trigger: 'start', delay: 3 },
+              { type: 'rain', cloud: 'dj5cloudA', x: 400, y: 420, w: 220, trigger: 'start', delay: 6.5, duration: 6 },
+              { type: 'rain', cloud: 'dj5cloudB', x: 1200, y: 400, w: 260, trigger: 'start', delay: 7, duration: 5.5 },
+              // ...and when the rain stops, a rainbow, with a pot of gold at its end
+              { type: 'rainbow', x: 1180, y: 880, r: 330, band: 12, trigger: 'start', delay: 12.5, fade: 2.5 },
+              { type: 'potofgold', x: 1468, y: 860, trigger: 'start', delay: 14.5, coins: 70 },
+              // a spaceship flies in, beams the alien down, and leaves; the alien shelters under the umbrella
+              { type: 'umbrella', x: 560, y: 700, w: 150, h: 110, color: '#a855f7', stripe: '#fde047' },
+              { id: 'dj5alien', type: 'alien', points: pts(900, 850, 560, 850), speed: 90, trigger: 'start' },
+              { type: 'spaceship', points: pts(1750, 540, 900, 540), speed: 220, cargo: 'dj5alien', leave: true, trigger: 'start', delay: 2 },
+            ],
+          },
+          {
+            id: 'dj6', name: '6 · Stone Age',
+            world: world({ walls: true, background: '#dbeafe' }),
+            objects: [
+              { type: 'cave', x: 300, y: 880, w: 380, h: 260 },
+              ...journey({ loops: [700, 1100] }),
+              // snow settles everywhere... except around the campfire and the torches
+              { id: 'dj6cloudA', type: 'snowcloud', x: 330, y: 340, w: 320, drift: 18, distance: 360, trigger: 'start' },
+              { id: 'dj6cloudB', type: 'snowcloud', x: 1180, y: 330, w: 360, drift: -14, distance: 300, trigger: 'start' },
+              { type: 'snow', cloud: 'dj6cloudA', x: 330, y: 380, heavy: 1.4, wind: 0.4, trigger: 'start', delay: 0.5 },
+              { type: 'snow', cloud: 'dj6cloudB', x: 1180, y: 370, heavy: 1.4, wind: -0.3, trigger: 'start', delay: 1 },
+              { type: 'torch', x: 175, y: 845 },
+              { type: 'torch', x: 425, y: 845 },
+              { type: 'campfire', x: 760, y: 872 },
+              { type: 'caveman', points: pts(300, 850, 690, 850), speed: 70, trigger: 'start', delay: 1 },
+              { type: 'cavewoman', points: pts(260, 850, 640, 850), speed: 70, trigger: 'start', delay: 2.5 },
+              { type: 'pterodactyl', points: pts(520, 440, 800, 400, 1080, 450, 800, 490), loop: true, speed: 120, trigger: 'start' },
+              // a boulder rolls down the slope towards the mammoth, who walks on into a stack of stones
+              { type: 'ramp', x: 1000, y: 770, w: 220, h: 14, angle: 32, color: '#78716c' },
+              { type: 'boulder', x: 918, y: 670, r: 26 },
+              { type: 'brickwall', x: 1300, y: 869, rows: 6, cols: 1, bw: 44, bh: 22, color: '#a8a29e' },
+              { type: 'mammoth', points: pts(1540, 834, 1180, 834), speed: 50, trigger: 'start', delay: 2 },
+            ],
+          },
+          {
+            id: 'dj7', name: '7 · Pink Party',
+            world: world({ walls: true, background: '#fce7f3' }),
+            objects: [
+              { type: 'dreamhouse', x: 1200, y: 880, w: 360, h: 300 },
+              ...journey({ loops: [700], target: 'dj1' }),
+              { type: 'archtext', x: 640, y: 340, text: 'PINK PARTY', size: 56, radius: 420, rainbow: false, color: '#ec4899' },
+              // the pink convertible knocks over the flamingos and opens the gift, which pops the party popper
+              { type: 'pinkcar', x: 120, y: 860, speed: 6, trigger: 'start', delay: 0.5 },
+              ...[0, 1, 2, 3, 4].map((i) => ({ type: 'flamingo', x: 320 + i * 38, y: 845 })),
+              { type: 'giftbox', x: 560, y: 862, link: 'dj7popper', color: '#ec4899', ribbon: '#fde047' },
+              { id: 'dj7popper', type: 'popper', x: 660, y: 860, angle: -70, trigger: 'touch' },
+              { type: 'ramp', x: 720, y: 840, w: 80, h: 14, angle: 90, color: '#f9a8d4' },
+              // a ring of fire that only the dark pink heart balloon can light: the pale one floats through first
+              { type: 'firering', x: 300, y: 450, r: 70, th: 8, stand: false, trigger: 'by', by: 'dj7heart' },
+              { type: 'heartballoon', x: 286, y: 690, r: 20, lift: 1.1, color: '#f9a8d4', trigger: 'none' },
+              { id: 'dj7heart', type: 'heartballoon', x: 318, y: 790, r: 22, lift: 1.1, color: '#db2777' },
+              // dolls and a pony out in front of the dream house
+              { type: 'fashiondoll', points: pts(790, 847, 980, 847), speed: 70, trigger: 'start' },
+              { type: 'boydoll', points: pts(1460, 847, 1240, 847), speed: 60, trigger: 'start' },
+              { type: 'skaterdoll', points: pts(1560, 847, 1330, 847), speed: 150, trigger: 'start', delay: 2 },
+              { type: 'pony', points: pts(1060, 850, 1120, 850), speed: 90, wander: 'ground', trigger: 'start' },
+              { type: 'handbag', x: 1010, y: 867 },
+              { type: 'highheel', x: 940, y: 869 },
+            ],
+          },
+        ],
+      },
+    },
+    {
+      name: 'Stormy Day',
+      description: 'A sunny day with animals roaming at random turns stormy: dark clouds roll in, the sun fades, rain pours (putting out a ring of fire, but not the one under the umbrella) and lightning sets off a bomb and startles a jumper.',
+      project: {
+        name: 'Stormy Day',
+        layers: [{
+          name: 'Storm',
+          world: world({ walls: true, background: '#bfe3ff' }),
+          objects: [
+            // sunny day: fair-weather clouds drift off and from 5 s the sun fades and the sky
+            // darkens (the sun darkens everything listed before it, so the clouds come first)
+            { type: 'cloud', x: 330, y: 130, w: 220, drift: 70, distance: 1500, trigger: 'start', delay: 3 },
+            { type: 'cloud', x: 780, y: 230, w: 160, drift: 60, distance: 1100, trigger: 'start', delay: 3.5 },
+            { type: 'cloud', x: 1040, y: 110, w: 180, drift: 80, distance: 800, trigger: 'start', delay: 2.5 },
+            { type: 'sun', x: 1320, y: 150, r: 60, trigger: 'start', delay: 5, fade: 5, dim: 0.6 },
+            // animals wandering at random
+            { type: 'bird', points: pts(520, 330, 620, 300), speed: 150, wander: 'free', trigger: 'start', color: '#2563eb' },
+            { type: 'bird', points: pts(1150, 420, 1050, 380), speed: 130, wander: 'free', trigger: 'start', color: '#dc2626' },
+            { type: 'butterfly', points: pts(700, 640, 760, 610), speed: 70, wander: 'free', trigger: 'start' },
+            { type: 'dog', points: pts(160, 865, 260, 865), speed: 120, wander: 'ground', trigger: 'start' },
+            { type: 'ramp', x: 420, y: 838, w: 84, h: 14, angle: 90, color: '#8b6b4a' }, // the dog's fence post
+            // what the storm sets off
+            { type: 'bomb', x: 600, y: 862, trigger: 'fire', delay: 1, radius: 190, power: 15 },
+            { type: 'brickwall', x: 760, y: 869, rows: 7, cols: 2, bw: 46, bh: 22 },
+            ...dominoes(880, 6, 34, { color: '#e2e8f0' }),
+            { type: 'jumper', x: 1100, y: 852, trigger: 'touch', jumpVy: 10, jumpVx: 0, jumps: 3, interval: 0.8, color: '#f59e0b' },
+            // two rings of fire: the rain puts out the open one; the one under the umbrella stays lit
+            { type: 'firering', x: 1000, y: 735, r: 34, th: 7, stand: true, trigger: 'start' },
+            { type: 'firering', x: 1205, y: 735, r: 34, th: 7, stand: true, trigger: 'start' },
+            { type: 'umbrella', x: 1205, y: 630, w: 130, h: 50, color: '#2563eb', stripe: '#facc15' },
+            { type: 'xmastree', x: 1420, y: 765, w: 110, h: 140, trigger: 'none', color: '#166534' },
+            // the storm rolls in from both sides
+            { id: 'sdA', type: 'darkcloud', x: -260, y: 170, w: 280, drift: 110, distance: 860, trigger: 'start', delay: 4 },
+            { id: 'sdB', type: 'darkcloud', x: 1860, y: 140, w: 320, drift: -110, distance: 760, trigger: 'start', delay: 4 },
+            { type: 'darkcloud', x: -420, y: 70, w: 400, drift: 120, distance: 1250, trigger: 'start', delay: 5, color: '#334155' },
+            { type: 'rain', cloud: 'sdA', x: 300, y: 260, w: 240, heavy: 1.2, wind: -1, trigger: 'start', delay: 9 },
+            { type: 'rain', cloud: 'sdB', x: 1300, y: 240, w: 280, heavy: 1.2, wind: -1, trigger: 'start', delay: 9.5 },
+            { type: 'lightning', cloud: 'sdA', x: 300, y: 200, strikes: 1, trigger: 'start', delay: 12 },
+            { type: 'lightning', cloud: 'sdB', x: 1300, y: 180, strikes: 2, interval: 1.4, trigger: 'start', delay: 14 },
+          ],
+        }],
+      },
+    },
+    {
+      name: 'Challenge 1 (easy)',
+      description: 'Puzzle: roll the blue marble into the gift. You may add ramps and curved ramps.',
+      project: {
+        name: 'Challenge 1 (easy)',
+        challenge: { on: true, allowed: ['ramp', 'curve'] },
+        layers: [{
+          name: 'Challenge 1',
+          world: world({ walls: true, background: '#ecfdf5' }),
+          objects: locked([
+            ...say(['CHALLENGE 1 (EASY): roll the blue marble into the gift', 'Press Run to test it; Restart and try again']),
+            { type: 'ramp', x: 300, y: 330, w: 420, h: 14, angle: 15, color: '#a0703c' },
+            { id: 'c1marble', type: 'marble', x: 120, y: 270, r: 14, color: '#2563eb' },
+            { type: 'ramp', x: 1300, y: 600, w: 300, h: 14, angle: 0, color: '#64748b' },
+            { type: 'giftbox', x: 1350, y: 575, trigger: 'by', by: 'c1marble', link: 'c1pop', color: '#16a34a', ribbon: '#fde047', goal: true },
+            { id: 'c1pop', type: 'popper', x: 1430, y: 580, angle: -100, trigger: 'touch' },
+          ]),
+        }],
+      },
+    },
+    {
+      name: 'Challenge 2 (medium)',
+      description: 'Puzzle: knock over every domino; the last one presses the button. You may add dominoes, ramps and stairways.',
+      project: {
+        name: 'Challenge 2 (medium)',
+        challenge: { on: true, allowed: ['domino', 'ramp', 'stairs'] },
+        layers: [{
+          name: 'Challenge 2',
+          world: world({ walls: true, background: '#eff6ff' }),
+          objects: locked([
+            ...say(['CHALLENGE 2 (MEDIUM): knock over every domino', 'The last domino must press the green button']),
+            { type: 'ramp', x: 250, y: 600, w: 300, h: 14, angle: 20, color: '#a0703c' },
+            { type: 'marble', x: 130, y: 520, r: 14, color: '#3b82f6' },
+            ...dominoes(500, 5, 34),
+            { type: 'ramp', x: 1050, y: 820, w: 380, h: 14, angle: 0, color: '#64748b' },
+            ...dominoes(900, 8, 34, { y: 783, color: '#bfdbfe' }),
+            { type: 'button', x: 1200, y: 806, label: '', link: 'c2pop', link2: 'c2jump', color: '#16a34a' },
+            { id: 'c2pop', type: 'popper', x: 1340, y: 860, angle: -90, trigger: 'touch', goal: true },
+            { id: 'c2jump', type: 'jumper', x: 1470, y: 852, trigger: 'touch', jumpVy: 10, jumpVx: 0, jumps: 3, interval: 0.8, direction: -1, color: '#16a34a' },
+          ]),
+        }],
+      },
+    },
+    {
+      name: 'Challenge 3 (hard)',
+      description: 'Puzzle: pop the red balloon by getting the torch’s fire to the fuse. You may add rings of fire, ramps and marbles.',
+      project: {
+        name: 'Challenge 3 (hard)',
+        challenge: { on: true, allowed: ['firering', 'ramp', 'marble'] },
+        layers: [{
+          name: 'Challenge 3',
+          world: world({ walls: true, background: '#fef2f2' }),
+          objects: locked([
+            ...say(['CHALLENGE 3 (HARD): pop the red balloon', 'Only fire lights the fuse, and the only fire is the torch', 'Hint: roll a marble through a lit ring of fire to light it'], '#7f1d1d'),
+            { type: 'torch', x: 150, y: 845 },
+            { type: 'fuse', points: pts(700, 872, 900, 868, 1000, 700, 1150, 520, 1250, 345), trigger: 'fire', burnSpeed: 140 },
+            { type: 'ramp', x: 1300, y: 372, w: 200, h: 14, angle: 0, color: '#64748b' },
+            { type: 'bomb', x: 1285, y: 347, r: 18, trigger: 'fire', delay: 1, radius: 200, power: 12 },
+            { type: 'ramp', x: 1350, y: 170, w: 260, h: 14, angle: 0, color: '#64748b' },
+            { type: 'balloon', x: 1380, y: 220, r: 26, lift: 1.4, trigger: 'fire', color: '#ef4444', goal: true },
+          ]),
         }],
       },
     },

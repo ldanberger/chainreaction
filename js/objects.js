@@ -11,6 +11,7 @@
  *   box(o, s)                      selection box {x,y,w,h,angle}
  *   hit(o, s, x, y, pad)           optional custom hit test
  *   build(e, sim)                  create the physics body (e.body) for a sim entity
+ *   init(e, sim)                   once every object is built (e.g. to take hold of another one)
  *   activate(e, sim)               called once when the trigger fires (after delay)
  *   update(e, sim)                 called every step before physics
  *   post(e, sim)                   called every step after physics
@@ -31,6 +32,10 @@
     CR.typeOrder.push(name);
   };
   CR.floorTop = (W) => W.height - 20;
+  // "Size" multiplier (o.scale) shared by every object except lines (fuse) and pieces that
+  // resize with their own end/radius handles, which already set their exact dimensions.
+  CR.scalable = (T) => !!T && !T.handles && !T.noScale;
+  CR.sizeOf = (o) => (CR.scalable(CR.types[o.type]) && +o.scale > 0 ? +o.scale : 1);
 
   // ---------------------------------------------------------------- geometry
   const G = (CR.geom = {
@@ -326,8 +331,13 @@
   const PDELAY = { key: 'delay', label: 'Delay (s)', type: 'number', step: 0.1, min: 0 };
   const PDIR = { key: 'direction', label: 'Direction', type: 'select', num: true, options: [[1, 'Right →'], [-1, '← Left']] };
   const num = (key, label, step, min, max, hint) => ({ key, label, type: 'number', step, min, max, hint });
+  const PWANDER = {
+    key: 'wander', label: 'Wander randomly', type: 'select',
+    options: [['', 'Off (follow the path)'], ['ground', 'Along the ground'], ['free', 'Anywhere']],
+    hint: 'roam from the first point, turning when it bumps into things',
+  };
   // shared with object packs in other files (e.g. objects-more.js)
-  CR.P = { PX, PY, PANGLE, PCOLOR, PTRIG, PDELAY, PDIR, num };
+  CR.P = { PX, PY, PANGLE, PCOLOR, PTRIG, PDELAY, PDIR, PWANDER, num };
 
   const M = () => window.Matter;
 
@@ -478,21 +488,21 @@
 
   // ---------------------------------------------------------------- cannon
   function cannonPivot(o) { return { x: o.x, y: o.y - 8 }; }
-  function fuseHole(o) {
-    const a = o.angle * D2R, c = Math.cos(a), s = Math.sin(a), p = cannonPivot(o);
-    return { x: p.x + c * -14 - s * -10, y: p.y + s * -14 + c * -10 };
+  function fuseHole(o, k = 1) {
+    const a = o.angle * D2R, c = Math.cos(a), s = Math.sin(a), p = { x: o.x, y: o.y - 8 * k };
+    return { x: p.x + (c * -14 - s * -10) * k, y: p.y + (s * -14 + c * -10) * k };
   }
   function fireCannon(e, sim) {
     const { Bodies, Body } = M();
-    const o = e.o, a = o.angle * D2R, c = Math.cos(a), s = Math.sin(a), p = cannonPivot(o);
-    const L = 50 + o.ballRadius;
+    const o = e.o, k = e.k, a = o.angle * D2R, c = Math.cos(a), s = Math.sin(a), p = { x: o.x, y: o.y - 8 * k };
+    const L = 50 * k + o.ballRadius;
     const ball = Bodies.circle(p.x + c * L, p.y + s * L, o.ballRadius, {
       density: 0.006, restitution: 0.25, friction: 0.05, frictionAir: 0.0005, collisionFilter: { group: e.group },
     });
     Body.setVelocity(ball, { x: c * o.power, y: s * o.power });
     sim.addExtra(ball, { kind: 'ball' });
     e.recoil = 1;
-    const mx = p.x + c * 52, my = p.y + s * 52;
+    const mx = p.x + c * 52 * k, my = p.y + s * 52 * k;
     sim.emit(mx, my, 'flash', 14, { dir: a, spread: 0.9, speed: 5 });
     sim.emit(mx, my, 'smoke', 16, { dir: a, spread: 1.1, speed: 2.2 });
   }
@@ -522,11 +532,12 @@
       e.shotsLeft = Math.max(1, Math.round(e.o.shots));
       e.nextShot = sim.t;
     },
+    busy: (e) => e.active && e.shotsLeft > 0,
     update(e, sim) {
       const o = e.o;
       e.recoil *= 0.85;
       if (e.triggered && !e.active) {
-        const p = fuseHole(o);
+        const p = fuseHole(o, e.k);
         sim.emit(p.x, p.y, 'spark', 2, { speed: 1.8, vy: -0.5 });
       }
       if (e.active && e.shotsLeft > 0 && sim.t >= e.nextShot - 1e-9) {
@@ -621,6 +632,8 @@
     pathMin: 2,
     showPath: false,
     ignitable: true,
+    noScale: true,
+    busy: (e) => e.active && !e.done,
     defaults: () => ({ points: [{ x: -120, y: 0 }, { x: -40, y: -12 }, { x: 40, y: 0 }, { x: 120, y: 0 }], burnSpeed: 90, trigger: 'start', delay: 0, color: '#b5814a' }),
     props: [PX('Start X'), PY('Start Y'), num('burnSpeed', 'Burn speed (px/s)', 5, 1),
       { key: 'trigger', label: 'Trigger', type: 'select', options: [['start', 'At start'], ['touch', 'When bumped or lit'], ['fire', 'Only when lit (fire, fuse, match)'], ['none', 'Never']] },
@@ -711,7 +724,7 @@
     pathColor: 'rgba(228,87,46,0.75)',
     iconScale: 0.7,
     defaults: () => ({ points: [{ x: 0, y: 0 }, { x: 320, y: 0 }], speed: 160, loop: false, trigger: 'start', delay: 0, color: '#e4572e', skin: '#f1c27d' }),
-    props: [PX(), PY(), num('speed', 'Speed (px/s)', 10, 0), { key: 'loop', label: 'Loop path', type: 'checkbox' }, PTRIG, PDELAY,
+    props: [PX(), PY(), num('speed', 'Speed (px/s)', 10, 0), { key: 'loop', label: 'Loop path', type: 'checkbox' }, PWANDER, PTRIG, PDELAY,
       PCOLOR('Shirt'), PCOLOR('Skin', 'skin')],
     box: (o, s) => ({ x: s.x, y: s.y, w: 30, h: 60, angle: 0 }),
     build(e, sim) {
@@ -750,6 +763,7 @@
       e.jumpsLeft = Math.max(1, Math.round(e.o.jumps));
       e.nextJump = sim.t;
     },
+    busy: (e) => e.active && e.jumpsLeft > 0,
     update(e, sim) {
       const o = e.o, b = e.body, { Body } = M();
       const grounded = e.contactFrame >= sim.frame - 2;
@@ -759,7 +773,7 @@
         e.jumpsLeft--;
         e.jumped = true;
         e.nextJump = sim.t + Math.max(0.1, o.interval);
-        sim.emit(b.position.x, b.position.y + 28, 'dust', 10, { speed: 1.5, dir: -Math.PI / 2, spread: Math.PI });
+        sim.emit(b.position.x, b.position.y + 28 * e.k, 'dust', 10, { speed: 1.5, dir: -Math.PI / 2, spread: Math.PI });
       }
     },
     draw(ctx, o, s) {
@@ -781,7 +795,7 @@
     iconScale: 0.6,
     defaults: () => ({ w: 84, h: 30, angle: 0, speed: 9, accel: 0.25, direction: 1, trigger: 'start', delay: 0, color: '#d62828', number: '7', density: 0.003 }),
     props: [PX(), PY(), PANGLE, num('speed', 'Top speed', 0.5, 0, undefined, 'pixels per frame'), num('accel', 'Acceleration', 0.05, 0),
-      PDIR, PTRIG, PDELAY, PCOLOR('Paint'), { key: 'number', label: 'Race number', type: 'text' },
+      PDIR, PTRIG, PDELAY, PCOLOR('Paint'), { key: 'number', label: 'Race number', type: 'text', maxLength: 4 },
       num('w', 'Length', 1, 20, 400), num('h', 'Height', 1, 10, 200), num('density', 'Density', 0.0005, 0.0001)],
     rot: { offset: -Math.PI / 2, dist: (o) => o.h / 2 + 20 },
     box: (o, s) => ({ x: s.x, y: s.y, w: o.w, h: o.h, angle: s.angle }),
@@ -807,7 +821,8 @@
         Body.setVelocity(b, { x: b.velocity.x + c * add * dir, y: b.velocity.y + s * add * dir });
       }
       if (sim.frame % 3 === 0 && fwd > 1.5) {
-        const rx = b.position.x - c * dir * o.w * 0.45 - s * o.h * 0.4, ry = b.position.y - s * dir * o.w * 0.45 + c * o.h * 0.4;
+        const w = o.w * e.k, h = o.h * e.k;
+        const rx = b.position.x - c * dir * w * 0.45 - s * h * 0.4, ry = b.position.y - s * dir * w * 0.45 + c * h * 0.4;
         sim.emit(rx, ry, 'dust', 2, { speed: 1.2, dir: dir > 0 ? Math.PI + 0.4 : -0.4, spread: 0.8 });
       }
     },
@@ -891,7 +906,7 @@
   const FIRE_TILT = 0.55, FIRE_HALF = 0.7;
   function dragonMouth(e) {
     const b = e.body;
-    return { x: b.position.x + 58 * e.facing, y: b.position.y - 15 };
+    return { x: b.position.x + 58 * e.k * e.facing, y: b.position.y - 15 * e.k };
   }
   function dragonFire(e, sim) {
     const o = e.o;
@@ -901,7 +916,7 @@
     }
     const m = dragonMouth(e), f = e.facing;
     const dir = f > 0 ? FIRE_TILT : Math.PI - FIRE_TILT;
-    const R = Math.max(20, o.fireRange);
+    const R = Math.max(20, o.fireRange) * e.k;
     const targets = [];
     for (const x of sim.ents) {
       if (x === e || x.triggered || x.o.trigger === 'none') continue;
@@ -930,10 +945,11 @@
     pathMin: 2,
     showPath: true,
     kinematic: true,
+    flies: true,
     pathColor: 'rgba(76,154,42,0.8)',
     iconScale: 0.4,
     defaults: () => ({ points: [{ x: 0, y: 0 }, { x: 260, y: -60 }, { x: 520, y: 0 }], speed: 170, loop: false, fireMode: 'near', fireRange: 200, solid: false, trigger: 'start', delay: 0, color: '#4c9a2a', wing: '#8fd16a' }),
-    props: [PX(), PY(), num('speed', 'Speed (px/s)', 10, 0), { key: 'loop', label: 'Loop path', type: 'checkbox' },
+    props: [PX(), PY(), num('speed', 'Speed (px/s)', 10, 0), { key: 'loop', label: 'Loop path', type: 'checkbox' }, PWANDER,
       { key: 'fireMode', label: 'Fire breath', type: 'select', options: [['near', 'When near a target'], ['always', 'Always'], ['off', 'Off']] },
       num('fireRange', 'Fire range (px)', 10, 20), { key: 'solid', label: 'Solid body', type: 'checkbox', hint: 'knocks things over as it flies' },
       PTRIG, PDELAY, PCOLOR('Scales'), PCOLOR('Wings', 'wing')],
@@ -1320,6 +1336,7 @@
     },
     activate(e, sim) { e.pulse = sim.t + e.o.hold; },
     onSignal(e, sim) { e.pulse = sim.t + e.o.hold; },
+    busy: (e, sim) => e.pulse > sim.t || CR.input.keys.has(CR.normKey(e.o.key)),
     substeps: true,
     update(e, sim) { sim.float(e.body); },
     // drive the paddle to its rest / flipped angle in small slices (velocities are per 1/60 s, hence * n)
@@ -1385,20 +1402,21 @@
       const o = e.o;
       e.body = M().Bodies.rectangle(o.x, o.y, 6, 40, { angle: o.angle * D2R, density: 0.001, friction: 0.5, frictionStatic: 0.8 });
     },
+    busy: (e) => e.active && !e.done,
     activate(e, sim) {
       e.out = sim.t + e.o.burnTime;
-      const h = matchHead(e.body);
+      const h = matchHead(e.body, e.k);
       sim.emit(h.x, h.y, 'spark', 14, { speed: 2.5 });
     },
     update(e, sim) {
       if (!e.active || e.done) return;
       if (sim.t >= e.out) {
         e.done = true;
-        const h = matchHead(e.body);
+        const h = matchHead(e.body, e.k);
         sim.emit(h.x, h.y, 'smoke', 6, { speed: 0.6, vy: -0.8 });
         return;
       }
-      const h = matchHead(e.body);
+      const h = matchHead(e.body, e.k);
       sim.emit(h.x, h.y, 'fire', 1, { dir: -Math.PI / 2, spread: 0.6, speed: 1.2, life: 16 });
       sim.igniteNear(h.x, h.y, e.o.reach, e);
     },
@@ -1432,8 +1450,8 @@
       ctx.restore();
     },
   });
-  function matchHead(b) {
-    return { x: b.position.x + Math.sin(b.angle) * 17, y: b.position.y - Math.cos(b.angle) * 17 };
+  function matchHead(b, k = 1) {
+    return { x: b.position.x + Math.sin(b.angle) * 17 * k, y: b.position.y - Math.cos(b.angle) * 17 * k };
   }
 
   CR.defineType('firering', {
@@ -1454,34 +1472,36 @@
       const o = e.o;
       e.body = M().Bodies.circle(o.x, o.y, o.r + o.th / 2, { isStatic: true, isSensor: true });
     },
+    busy: (e) => e.active && !e.done,
     activate(e, sim) {
       e.until = e.o.burnTime > 0 ? sim.t + e.o.burnTime : Infinity;
-      sim.emit(e.o.x, e.o.y - e.o.r, 'flash', 16, { speed: 3 });
+      sim.emit(e.o.x, e.o.y - e.o.r * e.k, 'flash', 16, { speed: 3 });
     },
     update(e, sim) {
       if (!e.active || e.done) return;
-      const o = e.o;
+      const o = e.o, r = o.r * e.k, th = o.th * e.k;
       if (sim.t >= e.until) {
         e.done = true;
         for (let i = 0; i < 10; i++) {
           const a = Math.random() * Math.PI * 2;
-          sim.emit(o.x + Math.cos(a) * o.r, o.y + Math.sin(a) * o.r, 'smoke', 1, { speed: 0.5, vy: -0.6 });
+          sim.emit(o.x + Math.cos(a) * r, o.y + Math.sin(a) * r, 'smoke', 1, { speed: 0.5, vy: -0.6 });
         }
         return;
       }
       for (let i = 0; i < 5; i++) {
         const a = Math.random() * Math.PI * 2;
-        sim.emit(o.x + Math.cos(a) * o.r, o.y + Math.sin(a) * o.r, 'fire', 1,
+        sim.emit(o.x + Math.cos(a) * r, o.y + Math.sin(a) * r, 'fire', 1,
           { dir: -Math.PI / 2, spread: 0.8, speed: 0.9, life: 18, vx: Math.cos(a) * 0.4, vy: Math.sin(a) * 0.4 });
       }
-      sim.igniteNear(o.x, o.y, o.r + o.th, e);
-      sim.burnBodiesInside(o.x, o.y, o.r + o.th / 2);
+      sim.igniteNear(o.x, o.y, r + th, e);
+      sim.burnBodiesInside(o.x, o.y, r + th / 2);
     },
     draw(ctx, o, s) {
       const e = s.e, lit = e && e.active && !e.done;
       ctx.save();
       if (o.stand) {
-        const bottom = CR.floorY != null ? CR.floorY : o.y + o.r + 120;
+        // the drawing is scaled by Size around (x, y): keep the post ending on the floor
+        const bottom = CR.floorY != null ? o.y + (CR.floorY - o.y) / CR.sizeOf(o) : o.y + o.r + 120;
         ctx.fillStyle = '#4b5563';
         ctx.fillRect(o.x - 3, o.y + o.r, 6, Math.max(0, bottom - o.y - o.r));
         ctx.fillRect(o.x - 14, bottom - 4, 28, 4);

@@ -14,7 +14,7 @@
   'use strict';
   const CR = window.CR;
   const D2R = CR.D2R, U = CR.draw, G = CR.geom;
-  const { PX, PY, PANGLE, PCOLOR, PTRIG, PDELAY, PDIR, num } = CR.P;
+  const { PX, PY, PANGLE, PCOLOR, PTRIG, PDELAY, PDIR, PWANDER, num } = CR.P;
   const M = () => window.Matter;
   const TAU = Math.PI * 2;
 
@@ -118,6 +118,7 @@
   // point at local (lx, ly) on a driven body, world coordinates
   function local(e, lx, ly) {
     const b = e.body, c = Math.cos(b.angle), s = Math.sin(b.angle), f = e.facing;
+    lx *= e.k; ly *= e.k;
     return { x: b.position.x + c * lx * f - s * ly, y: b.position.y + s * lx * f + c * ly };
   }
 
@@ -131,13 +132,14 @@
       pathMin: 2,
       showPath: true,
       kinematic: true,
+      flies: !!flying,
       pathColor: d.pathColor || (flying ? 'rgba(14,116,144,0.75)' : 'rgba(146,64,14,0.75)'),
       iconSize: { w: d.w, h: d.h },
       defaults: () => Object.assign({
         points: flying ? [{ x: 0, y: 0 }, { x: 260, y: -50 }, { x: 520, y: 0 }] : [{ x: 0, y: 0 }, { x: 320, y: 0 }],
         speed: d.speed, loop: false, trigger: 'start', delay: 0, color: d.color,
       }, flying ? { solid: false } : {}),
-      props: [PX(), PY(), num('speed', 'Speed (px/s)', 10, 0), { key: 'loop', label: 'Loop path', type: 'checkbox' },
+      props: [PX(), PY(), num('speed', 'Speed (px/s)', 10, 0), { key: 'loop', label: 'Loop path', type: 'checkbox' }, PWANDER,
         ...(flying ? [{ key: 'solid', label: 'Solid body', type: 'checkbox', hint: 'knocks things over as it goes' }] : []),
         PTRIG, PDELAY, PCOLOR()],
       box: (o, s) => ({ x: s.x, y: s.y, w: d.w + 8, h: d.h + 8, angle: 0 }),
@@ -197,6 +199,7 @@
       },
       activate: J.activate,
       update: J.update,
+      busy: J.busy,
       draw(ctx, o, s) {
         const e = s.e, air = !!(e && e.air && e.jumped);
         ctx.save();
@@ -453,7 +456,7 @@
     label: 'Rocket', category: 'Vehicles', desc: 'Fast, points where it flies; its exhaust lights fuses and rings of fire it passes.', w: 70, h: 24, speed: 300, color: '#f8fafc', rotate: true, flap: 1,
     update(e, sim) {
       if (!e.active || e.done) return;
-      const b = e.body.position, h = e.heading, tx = b.x - Math.cos(h) * 40, ty = b.y - Math.sin(h) * 40;
+      const b = e.body.position, h = e.heading, tx = b.x - Math.cos(h) * 40 * e.k, ty = b.y - Math.sin(h) * 40 * e.k;
       sim.emit(tx, ty, 'fire', 3, { dir: h + Math.PI, spread: 0.5, speed: 3, life: 14 });
       if (sim.frame % 2 === 0) sim.emit(tx, ty, 'smoke', 1, { dir: h + Math.PI, spread: 0.6, speed: 1 });
       sim.igniteNear(tx, ty, 24, e);
@@ -634,7 +637,7 @@
     const img = new Image();
     const sp = Object.assign({ img, ready: false }, opt);
     img.onload = () => { sp.ready = true; if (CR.onAssetsChanged) CR.onAssetsChanged(); };
-    img.src = src;
+    img.src = src; // scan-ok: only the built-in sprite paths below
     CR.sprites[name] = sp;
     return sp;
   };
@@ -1045,7 +1048,7 @@
         b.force.x += c * b.mass * k;
         b.force.y += s * b.mass * k;
       }
-      if (sim.frame % 4 === 0) sim.emit(o.x + c * 24, o.y + s * 24, 'dust', 1, { dir: a, spread: 0.5, speed: 4, life: 20 });
+      if (sim.frame % 4 === 0) sim.emit(o.x + c * 24 * e.k, o.y + s * 24 * e.k, 'dust', 1, { dir: a, spread: 0.5, speed: 4, life: 20 });
     },
     draw(ctx, o, s) {
       const e = s.e;
@@ -1066,6 +1069,109 @@
       ctx.lineWidth = 1.5;
       ctx.beginPath(); ctx.ellipse(-2, 0, 6, 25, 0, 0, TAU); ctx.stroke();
       ctx.restore();
+    },
+  });
+
+  // shared with the themed object packs (objects-themes.js)
+  CR.pack = { vehicle, flyer, walker, hopper, ball, poly, ell, box, eye, line, legs4, wheel, dark, light };
+
+  // =================================================================== LAYERS: gateway
+  // A doorway to another layer. Anything that arrives (its centre enters the doorway) sets it
+  // off; whatever was already inside when the run started doesn't count. After `wait` seconds
+  // the app shows the target layer and runs it (see sim.requestLayer / app.js).
+  function archPath(ctx, w, h) {
+    const r = Math.min(w / 2, h / 2);
+    ctx.beginPath();
+    ctx.moveTo(-w / 2, h / 2);
+    ctx.lineTo(-w / 2, -h / 2 + r);
+    ctx.arc(0, -h / 2 + r, w / 2, Math.PI, TAU);
+    ctx.lineTo(w / 2, h / 2);
+    ctx.closePath();
+  }
+  CR.defineType('gateway', {
+    label: 'Gateway',
+    category: 'Layers',
+    description: 'A doorway to another layer. When something arrives (anything already inside at the start doesn\'t count), it switches to that layer after the set time and runs it.',
+    iconSize: { w: 70, h: 100 },
+    noScale: true, // has its own width and height
+    defaults: () => ({ w: 70, h: 100, target: '', wait: 1, arrival: false, color: '#7c3aed' }),
+    props: [PX(), PY(), num('w', 'Width', 1, 10, 2000), num('h', 'Height', 1, 10, 2000),
+      { key: 'target', label: 'Leads to', type: 'layerref', hint: 'the layer to show and run' },
+      num('wait', 'Switch after (s)', 0.1, 0, 60, 'seconds after something arrives'),
+      { key: 'arrival', label: 'Arrival only', type: 'checkbox', hint: 'just marks where things come in from another layer; never switches' },
+      PCOLOR()],
+    box: (o, s) => ({ x: s.x, y: s.y, w: o.w, h: o.h, angle: 0 }),
+    build(e) {
+      const o = e.o;
+      e.body = M().Bodies.rectangle(o.x, o.y, o.w, o.h, { isStatic: true, isSensor: true });
+      e.start = null;
+      e.arrived = -1;
+    },
+    post(e, sim) {
+      if (e.arrived >= 0 || e.o.arrival) return;
+      const o = e.o, inside = new Set();
+      for (const b of M().Composite.allBodies(sim.world)) {
+        if (b.isStatic) continue;
+        if (Math.abs(b.position.x - o.x) <= o.w / 2 && Math.abs(b.position.y - o.y) <= o.h / 2) inside.add(b);
+      }
+      if (!e.start) { e.start = inside; return; } // first step: these were here from the beginning
+      for (const b of inside) {
+        if (e.start.has(b)) continue;
+        e.arrived = sim.t;
+        sim.requestLayer(o.target || '', sim.t + Math.max(0, +o.wait || 0));
+        sim.emit(o.x, o.y, 'flash', 18, { speed: 3 });
+        sim.emit(o.x, o.y, 'spark', 24, { speed: 3 });
+        return;
+      }
+    },
+    draw(ctx, o, s) {
+      const e = s.e, t = s.t || 0, w = o.w, h = o.h;
+      const on = e && e.arrived >= 0, k = on ? Math.min(1, (t - e.arrived) / Math.max(0.05, o.wait || 0)) : 0;
+      ctx.save();
+      ctx.translate(s.x, s.y);
+      archPath(ctx, w, h);
+      const g = ctx.createRadialGradient(0, 0, 2, 0, 0, Math.max(w, h) * 0.6);
+      g.addColorStop(0, on ? 'rgba(255,255,255,0.95)' : light(o.color, 0.6));
+      g.addColorStop(1, o.color);
+      ctx.fillStyle = g;
+      ctx.globalAlpha = on ? 0.85 + 0.15 * k : 0.75;
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      // swirl
+      ctx.save();
+      ctx.clip();
+      ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+      ctx.lineWidth = 2;
+      const spin = t * (on ? 9 : 2);
+      for (let i = 0; i < 3; i++) {
+        const r = Math.min(w, h) * (0.15 + i * 0.13);
+        ctx.beginPath();
+        ctx.arc(0, h * 0.08, r, spin + i * 2.1, spin + i * 2.1 + 3.6);
+        ctx.stroke();
+      }
+      ctx.restore();
+      archPath(ctx, w, h);
+      ctx.strokeStyle = dark(o.color, -0.45);
+      ctx.lineWidth = 4;
+      ctx.stroke();
+      if (on) {
+        ctx.strokeStyle = '#fde047';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(0, -h / 2 - 14, 8, -Math.PI / 2, -Math.PI / 2 + TAU * k);
+        ctx.stroke();
+      }
+      const name = o.arrival ? '' : CR.layerLabel ? CR.layerLabel(o.target) : '';
+      if (name && !(s.icon)) {
+        ctx.font = '600 13px system-ui, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = dark(o.color, -0.5);
+        ctx.fillText('→ ' + name, 0, h / 2 + 16);
+      }
+      ctx.restore();
+    },
+    icon(g) {
+      this.draw(g, Object.assign(this.defaults(), { x: 0, y: 0, w: 26, h: 38 }), { x: 0, y: 0, e: null, t: 0, icon: true });
     },
   });
 })();

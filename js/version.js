@@ -4,4 +4,4 @@
  * home-screen installs pick up the new files instead of cached ones.
  */
 window.CR = window.CR || {};
-window.CR.VERSION = '1.05';
+window.CR.VERSION = '1.21';

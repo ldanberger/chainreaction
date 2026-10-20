@@ -2,6 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <!-- Content-Security-Policy: only this site's own scripts, styles and images; no network connections,
+       plug-ins, frames or form posts. (file: only matters when index.html is opened straight from disk;
+       a web page can never load file: URLs.) See SECURITY.md. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' file:; style-src 'self' file:; img-src 'self' file:; font-src 'self'; connect-src 'none'; media-src 'none'; object-src 'none'; frame-src 'none'; child-src 'none'; worker-src 'none'; manifest-src 'self' file:; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
   <title>Chain Reaction Workbench</title>
   <meta name="theme-color" content="#f59e0b">
@@ -12,11 +17,8 @@
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" type="image/png" href="icons/favicon-32.png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
-  <script>
-    // apply the saved theme before first paint (light is the default)
-    try { if (localStorage.getItem('chainreaction.theme') === 'dark') document.documentElement.dataset.theme = 'dark'; } catch (e) {}
-  </script>
-  <link rel="stylesheet" href="css/styles.css?v=1.05">
+  <script src="js/theme-init.js?v=1.21"></script>
+  <link rel="stylesheet" href="css/styles.css?v=1.21">
 </head>
 <body>
   <div id="ptr" aria-hidden="true"><span class="ptr-icon">&#x21BB;</span><span class="ptr-text">Pull to refresh</span></div>
@@ -31,10 +33,13 @@
       <button class="btn" id="btnOpen" title="Open a project .json file (Ctrl+O)">Open&hellip;</button>
       <button class="btn" id="btnSave" title="Save project (Ctrl+S)">Save</button>
       <button class="btn" id="btnSaveAs" title="Save project as a new file">Save As&hellip;</button>
+      <button class="btn" id="btnChallenges" title="Built-in challenges (and any challenge files you've loaded), and which ones you have solved">&#x1F3C6; Challenges</button>
+      <button class="btn" id="btnLoadChallenges" title="Load a challenge file (.json) — a set of challenges made for this app">Load challenges&hellip;</button>
       <select id="exampleSel" class="btn" title="Load an example project">
         <option value="">Examples&hellip;</option>
       </select>
       <label class="chk" title="Snap positions to a 10px grid"><input type="checkbox" id="snapChk"> Snap</label>
+      <label class="chk" title="Multi-select: clicks/taps add or remove objects, and dragging empty space draws a selection box"><input type="checkbox" id="multiChk"> Multi</label>
       <label class="chk" title="Show runner and dragon paths"><input type="checkbox" id="pathsChk" checked> Paths</label>
     </div>
     <span class="spacer"></span>
@@ -46,6 +51,7 @@
       <button class="btn icon" id="btnHelp" title="Help &amp; shortcuts">?</button>
     </div>
     <input type="file" id="fileInput" accept=".json,application/json" hidden>
+    <input type="file" id="chalFileInput" accept=".json,application/json" hidden>
   </header>
 
   <div id="main">
@@ -65,6 +71,24 @@
     </aside>
 
     <section id="center">
+      <div id="commandbar">
+        <button class="cmd" id="btnRestart" title="Restart from the beginning (R)">&#x27F2;<span class="lbl"> Restart</span></button>
+        <button class="cmd" id="btnStep" title="Advance one frame (.)  Shift = 10 frames">&#x23ED;<span class="lbl"> Step</span></button>
+        <button class="cmd primary" id="btnRun" title="Run / pause (Space)">&#x25B6; Run</button>
+        <button class="cmd" id="btnChallenge" title="Challenge mode (saved with the file): when ON, everything already in the project is locked and players can only add pieces">&#x1F513; Challenge OFF</button>
+        <div class="speed" title="Simulation speed (- / +)">
+          <button class="cmd small" id="btnSlower">&minus;</button>
+          <span id="speedVal">1&times;</span>
+          <button class="cmd small" id="btnFaster">+</button>
+        </div>
+        <div id="flipBtns" title="Paddle keys — hold to flip"></div>
+        <span class="readout score" id="scoreVal" hidden>Score 0</span>
+        <span class="readout" id="timeVal">t = 0.00 s</span>
+        <span class="readout muted" id="statusVal">Editing</span>
+        <span class="spacer"></span>
+        <span class="readout muted" id="cursorVal"></span>
+      </div>
+
       <div id="tabbar">
         <div id="tabs"></div>
         <button class="tab-add" id="btnAddLayer" title="New layer">+</button>
@@ -83,26 +107,30 @@
           <button class="btn primary" id="btnEmptyNew">Create a new layer</button>
         </div>
         <div id="toast" hidden></div>
+        <div id="winBanner" hidden></div>
       </div>
 
-      <div id="commandbar">
-        <button class="cmd" id="btnRestart" title="Restart from the beginning (R)">&#x27F2;<span class="lbl"> Restart</span></button>
-        <button class="cmd" id="btnStep" title="Advance one frame (.)  Shift = 10 frames">&#x23ED;<span class="lbl"> Step</span></button>
-        <button class="cmd primary" id="btnRun" title="Run / pause (Space)">&#x25B6; Run</button>
-        <div class="speed" title="Simulation speed (- / +)">
-          <button class="cmd small" id="btnSlower">&minus;</button>
-          <span id="speedVal">1&times;</span>
-          <button class="cmd small" id="btnFaster">+</button>
-        </div>
-        <div id="flipBtns" title="Paddle keys — hold to flip"></div>
-        <span class="readout score" id="scoreVal" hidden>Score 0</span>
-        <span class="readout" id="timeVal">t = 0.00 s</span>
-        <span class="readout muted" id="statusVal">Editing</span>
-        <span class="spacer"></span>
-        <span class="readout muted" id="cursorVal"></span>
-      </div>
     </section>
   </div>
+
+  <dialog id="chalDlg">
+    <div class="cd-head">
+      <h2>&#x1F3C6; Challenges</h2>
+      <select id="cdSet" title="Challenge set"></select>
+      <span id="cdCount" class="cd-count"></span>
+      <span class="spacer"></span>
+      <button class="btn small" id="cdLoad" title="Load a challenge file (.json)">Load challenge file&hellip;</button>
+      <button class="btn small danger" id="cdRemove" title="Remove this loaded set from this browser">Remove set</button>
+      <form method="dialog"><button class="btn">Close</button></form>
+    </div>
+    <div class="cd-progress"><div id="cdBar"></div></div>
+    <div id="cdFilters" class="cd-filters"></div>
+    <div class="cd-body">
+      <div id="cdGrid" class="cd-grid"></div>
+      <div id="cdDetail" class="cd-detail"></div>
+    </div>
+    <p class="muted cd-foot">Your progress is kept in this browser. <button class="btn small" id="cdReset">Reset progress</button></p>
+  </dialog>
 
   <dialog id="helpDlg">
     <h2>Chain Reaction Workbench <span class="version" id="helpVersion"></span></h2>
@@ -112,7 +140,8 @@
       <li><b>Drag</b> a Toolkit item into the work area (or double-click it to drop it in the centre).</li>
       <li><b>Click</b> an object to select it and edit it in Properties. <b>Drag</b> to move; drag the round orange handle to rotate.</li>
       <li><b>Blue handles</b>: square ones change length (ramps, trampolines, curved-ramp ends); round ones set a curve's radius or a paddle's rest/flipped angle.</li>
-      <li><b>Paths</b> (fuse, runner, dragon): drag the points; double-click the line to add a point; double-click a point to remove it.</li>
+      <li><b>Paths</b> (fuse, runner, dragon): drag the points; double-click the line to add a point; double-click a point to remove it. Set <b>Wander randomly</b> (along the ground, or anywhere) to let it roam instead, bouncing off what it bumps.</li>
+      <li><b>Shift/Ctrl-click</b> to select several objects; <b>Shift-drag</b> empty space to box-select. Drag any selected object to move them all.</li>
       <li><b>Drag empty space</b> or middle-drag to pan. <b>Wheel</b> to zoom.</li>
     </ul>
     <h3>Touch (phone / tablet)</h3>
@@ -121,6 +150,7 @@
       <li><b>Tap</b> an object to select it; switch to <b>Properties</b> to edit it.</li>
       <li><b>Double-tap</b> a path to add a point, or a point to remove it.</li>
       <li><b>One finger</b> on empty space pans; <b>two fingers</b> pinch to zoom.</li>
+      <li>Turn on <b>Multi</b> (☰ menu) to tap several objects, or drag a box around them, then move, copy or delete them together.</li>
       <li><b>Pull down</b> on the top bar to refresh (handy when installed on the home screen).</li>
     </ul>
     <h3>Keyboard</h3>
@@ -131,6 +161,8 @@
       <li><kbd>-</kbd> / <kbd>+</kbd> speed</li>
       <li><kbd>Del</kbd> delete selection</li>
       <li><kbd>Ctrl</kbd>+<kbd>D</kbd> duplicate</li>
+      <li><kbd>Ctrl</kbd>+<kbd>C</kbd> / <kbd>V</kbd> copy / paste (any layer)</li>
+      <li><kbd>Ctrl</kbd>+<kbd>A</kbd> select all</li>
       <li><kbd>Arrows</kbd> nudge (<kbd>Shift</kbd> = 10px)</li>
       <li><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Y</kbd> undo / redo</li>
       <li><kbd>Ctrl</kbd>+<kbd>S</kbd> save &middot; <kbd>Ctrl</kbd>+<kbd>O</kbd> open</li>
@@ -138,19 +170,36 @@
     </ul>
     <h3>Pinball</h3>
     <p class="muted">Give each paddle a <b>Flip key</b> in Properties (click the box, then press the key). While running, hold the key — or the matching on-screen button — to flip. Targets and bumpers can set off another object via <b>When hit, trigger</b>.</p>
+    <h3>Buttons &amp; countdowns</h3>
+    <p class="muted">A <b>Button</b> gets an on-screen button in the command bar (plus an optional key). Pressing it while running, or bumping something into it, sets off up to three linked objects. A <b>Countdown</b> counts down on screen and sets off its linked objects at zero. Linked objects need their Trigger set to <i>When touched</i>.</p>
     <h3>Triggers</h3>
-    <p class="muted">Every active object has a <b>Trigger</b>: <i>At start</i>, <i>When touched</i> (bumped by something moving, reached by a burning fuse, or hit by dragon fire) or <i>Never</i>, plus an optional delay. Fuses and cannons are also lit by fire or by a fuse ending on them.</p>
+    <p class="muted">Every active object has a <b>Trigger</b>: <i>At start</i>, <i>When touched</i> (bumped by something moving, reached by a burning fuse, or hit by dragon fire), <i>When touched by…</i> one object you pick (only that object sets it off), or <i>Never</i>, plus an optional delay. Fuses and cannons are also lit by fire or by a fuse ending on them.</p>
+    <h3>Challenges</h3>
+    <p class="muted"><b>&#x1F3C6; Challenges</b> (in the menu) has 130 built-in puzzles, from easy to very hard, with your progress. <b>Load challenges…</b> adds a challenge file someone has made (see CHALLENGE-PROMPT.md). Solve one by adding pieces until its &#x1F3C6; goal object goes off; stuck? <b>Show solution</b> loads it with the answer in place. In your own projects, tick <b>&#x1F3C1; Completes the challenge</b> on the object that marks success.</p>
+    <h3>Challenge mode</h3>
+    <p class="muted">Turn <b>Challenge ON</b> (next to Run) before saving to make a puzzle: everything already in the project is locked — players can look but not move, change or delete it — and they solve it by adding their own pieces. With the challenge OFF, use <b>Challenge pieces</b> at the top of the Toolkit to allow <i>All</i> pieces or <i>Choose</i> which ones (tick them on the tiles). The challenge setting is saved with the file; Challenge OFF unlocks everything again.</p>
     <h3>Layers</h3>
     <p class="muted">Each layer is its own scene, shown as a tab. Close a tab to put the layer away; reopen it from the Layers menu. All layers are saved together in one .json project file.</p>
+    <p class="muted">To move an object to another layer, select it, press <b>Copy</b> (Ctrl+C), switch tabs and press <b>Paste</b> (Ctrl+V). A <b>Gateway</b> links layers: when something arrives in it (whatever started inside doesn't count), it switches to its target layer after the set time and runs it.</p>
+    <h3>Size &amp; running</h3>
+    <p class="muted">Most objects have a <b>Size</b> in Properties (objects with their own size settings, like ramps, stairways and text, don't) (1 = normal, 2 = twice as big). A run stops by itself once nothing has happened for 3 seconds; press Run to carry on. On a phone, the panels hide while a run is in progress.</p>
     <form method="dialog"><button class="btn primary">Close</button></form>
   </dialog>
 
-  <script src="js/version.js?v=1.05"></script>
+  <script src="js/version.js?v=1.21"></script>
   <script src="lib/matter.min.js?v=0.19.0"></script>
-  <script src="js/objects.js?v=1.05"></script>
-  <script src="js/objects-more.js?v=1.05"></script>
-  <script src="js/sim.js?v=1.05"></script>
-  <script src="js/examples.js?v=1.05"></script>
-  <script src="js/app.js?v=1.05"></script>
+  <script src="js/objects.js?v=1.21"></script>
+  <script src="js/objects-more.js?v=1.21"></script>
+  <script src="js/objects-extra.js?v=1.21"></script>
+  <script src="js/objects-themes.js?v=1.21"></script>
+  <script src="js/objects-weather.js?v=1.21"></script>
+  <script src="js/objects-prehistoric.js?v=1.21"></script>
+  <script src="js/objects-barbie.js?v=1.21"></script>
+  <script src="js/objects-construction.js?v=1.21"></script>
+  <script src="js/sim.js?v=1.21"></script>
+  <script src="js/examples.js?v=1.21"></script>
+  <script src="js/challenges-data.js?v=1.21"></script>
+  <script src="js/safety.js?v=1.21"></script>
+  <script src="js/app.js?v=1.21"></script>
 </body>
 </html>
